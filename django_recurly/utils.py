@@ -1,20 +1,43 @@
 import urllib
+import urlparse
 
-from django.conf import settings
+from . import settings as app_settings
 
-def hosted_login_url(hosted_login_token):
+
+def get_hosted_account_management_url(hosted_login_token):
     return 'https://%s.recurly.com/account/%s' % (
-        settings.RECURLY_SUBDOMAIN,
+        app_settings.RECURLY_SUBDOMAIN,
         hosted_login_token,
     )
 
-def hosted_payment_page_url(plan_code, account_code, data=None):
-    if data is None:
+
+def encode_dict(data):
+    return dict([
+        (key, val.encode('utf-8')) for key, val in data.items()
+        if isinstance(val, basestring)
+        ])
+
+
+def get_hosted_payment_page_url(plan_code, account_code, data=None):
+    if not data:
         data = {}
 
-    return 'https://%s.recurly.com/subscribe/%s/%d?%s' % (
-        settings.RECURLY_SUBDOMAIN,
+    # passing account_code and username as a query param would also work
+    # data['account_code'] = account_code
+    # url = 'https://%s.recurly.com/subscribe/%s/%s' % (
+    #     app_settings.RECURLY_SUBDOMAIN,
+    #     plan_code,
+    #     urllib.urlencode(encode_dict(data))
+    # )
+    url = 'https://%s.recurly.com/subscribe/%s/%s/' % (
+        app_settings.RECURLY_SUBDOMAIN,
         plan_code,
         account_code,
-        urllib.urlencode(data),
+    )
+    username = data.pop("username", None)
+    if username:
+        url = urlparse.urljoin(url, username)
+    return '%s?%s' % (
+        url,
+        urllib.urlencode(encode_dict(data)),
     )
