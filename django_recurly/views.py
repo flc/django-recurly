@@ -19,16 +19,25 @@ logger = logging.getLogger(__name__)
 @recurly_basic_authentication
 @require_POST
 def push_notification(request):
-    data = recurly.objects_for_push_notification(request.body)
-
+    # big try catch because we don't want to send recurly any
+    # technical error response with all our settings if we happen to
+    # test the webhooks with DEBUG=True
     try:
-        _type = data['type']
-        logger.info("Recurly notification: %s", _type)
-        signal = getattr(signals, _type)
-    except AttributeError:
-        return HttpResponseBadRequest("Unrecognized notification type.")
+        data = recurly.objects_for_push_notification(request.body)
 
-    signal.send(sender=request, data=data)
+        try:
+            _type = data['type']
+            logger.info("Recurly notification: %s", _type)
+            signal = getattr(signals, _type)
+        except AttributeError:
+            return HttpResponseBadRequest("Unrecognized notification type.")
+
+        signal.send(sender=request, data=data)
+    except Exception as e:
+        if settings.DEBUG:
+            logger.exception(e)
+            return HttpResponse(status=500)
+        raise
 
     return HttpResponse()
 
@@ -62,5 +71,20 @@ if 'rest_framework' in settings.INSTALLED_APPS:
             account, created = Account.get_or_create_from_user(user)
             return Response({
                 'url': account.get_hosted_payment_page_url(plan_code)
+                })
+
+
+    class HostedAccountManagementPageData(APIView):
+
+        def get(self, request, format=None):
+            user = request.user
+            try:
+                account = Account.objects.filter(user=request.user)[0]
+            except IndexError:
+                url = None
+            else:
+                url = account.get_hosted_account_management_url()
+            return Response({
+                'url': url
                 })
 

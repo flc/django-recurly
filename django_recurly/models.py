@@ -37,6 +37,8 @@ class Account(models.Model):
     hosted_login_token = models.TextField(blank=True)
 
     def get_hosted_account_management_url(self):
+        if not self.hosted_login_token:
+            return None
         return get_hosted_account_management_url(self.hosted_login_token)
 
     def get_hosted_payment_page_url_params(self):
